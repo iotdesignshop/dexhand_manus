@@ -11,6 +11,8 @@
 #include "rclcpp/rclcpp.hpp"
 #include "sensor_msgs/msg/joint_state.hpp"
 #include "geometry_msgs/msg/pose_array.hpp"
+#include "tf2/LinearMath/Quaternion.h"
+#include "tf2/LinearMath/Matrix3x3.h"
 
 #include <fstream>
 #include <iostream>
@@ -30,6 +32,8 @@ static const int NUM_FINGERS_ON_HAND = 5;
 // Global for now to pass joint data between the Manus SDK and ROS2
 float g_euler_joint[24][3] = {0.0};
 
+bool KeyDown();
+
 /// @brief ROS2 publisher class for the manus_ros2 node
 class DexHandManus : public rclcpp::Node
 {
@@ -41,6 +45,9 @@ public:
 		manus_left_listener_ = this->create_subscription<geometry_msgs::msg::PoseArray>("manus_left", 10, std::bind(&DexHandManus::manus_left_callback, this, std::placeholders::_1));
 		manus_right_listener_ = this->create_subscription<geometry_msgs::msg::PoseArray>("manus_right", 10, std::bind(&DexHandManus::manus_right_callback, this, std::placeholders::_1));
 
+
+		// Publish an initial joint state to reset the hand to a known position
+		publish_joint_states();
     }
 
 	// print_joint - prints global joint data from Manus Hand after transform
@@ -59,18 +66,17 @@ private:
 	// manus_left_callback - callback for the left manus glove
 	void manus_left_callback(const geometry_msgs::msg::PoseArray::SharedPtr msg)
 	{
-		RCLCPP_INFO_STREAM(this->get_logger(), "Left callback: " << msg->header.frame_id << " " << msg->poses[0].position.x << " " << msg->poses[0].position.y << " " << msg->poses[0].position.z << " " << msg->poses[0].orientation.x << " " << msg->poses[0].orientation.y << " " << msg->poses[0].orientation.z << " " << msg->poses[0].orientation.w);
+		processPose(msg);
 	}
 
 	// manus_right_callback - callback for the right manus glove
 	void manus_right_callback(const geometry_msgs::msg::PoseArray::SharedPtr msg)
 	{
-		RCLCPP_INFO_STREAM(this->get_logger(), "Right callback: " << msg->header.frame_id << " " << msg->poses[0].position.x << " " << msg->poses[0].position.y << " " << msg->poses[0].position.z << " " << msg->poses[0].orientation.x << " " << msg->poses[0].orientation.y << " " << msg->poses[0].orientation.z << " " << msg->poses[0].orientation.w);
-	
+		processPose(msg);
 	}
 
-	// timer_callback - publishes joint states to ROS2
-	void timer_callback()
+	// Publishes the joint states to the ROS2 network
+	void publish_joint_states()
 	{
 		auto joint_state = sensor_msgs::msg::JointState();
 
@@ -135,18 +141,78 @@ private:
 		joint_state.position.push_back(-g_euler_joint[2][2]); // "thumb_knuckle"
 		joint_state.position.push_back(-g_euler_joint[3][2]); // "thumb_tip"
 
-		// RCLCPP_INFO(this->get_logger(), "Publishing: %lf", joint_state.position[0]);
-
 		// Set timestamp to current ROS time
 		joint_state.header.stamp = this->now();
 
 		// Command the robot to move
 		publisher_->publish(joint_state);
-
-		// std::this_thread::sleep_for(std::chrono::milliseconds(33)); // or roughly 30fps, but good enough to show the results.
 	}
 
-	rclcpp::TimerBase::SharedPtr timer_;
+	void processPose(const geometry_msgs::msg::PoseArray::SharedPtr msg) {
+		double roll, pitch, yaw;
+		static bool initialized = false;
+		
+		// Initialize with identity quaternion
+		static tf2::Quaternion referenceRotation(1.0, 0.0, 0.0, 0.0);
+		
+		// Put the skeleton data in the bridge structure
+		for (uint32_t i = 0; i < msg->poses.size(); i++) {
+
+			const auto &joint = msg->poses[i];
+
+			// Calculate delta rotation only for the wrist (joint 0)
+			if (i == 0) {
+				if (!initialized) {
+					// Store the current orientation
+					referenceRotation = tf2::Quaternion(joint.orientation.x, joint.orientation.y, joint.orientation.z, joint.orientation.w);
+					initialized = true;
+				}
+				else if (KeyDown()) {
+					initialized = false;
+				}
+
+				// Calculate the inverse of the reference rotation
+				tf2::Quaternion referenceRotationInverse = referenceRotation.inverse();
+				
+				// Calculate the delta rotation
+				tf2::Quaternion newRotationInverse = referenceRotationInverse * tf2::Quaternion(joint.orientation.x, joint.orientation.y, joint.orientation.z, joint.orientation.w);
+				
+				// Convert the delta rotation to Euler angles
+				tf2::Matrix3x3(newRotationInverse).getRPY(roll, pitch, yaw);
+
+				// Assign roll, pitch, and yaw directly to g_dexhand_joint
+				g_euler_joint[i][0] = roll;
+				g_euler_joint[i][1] = pitch;
+				g_euler_joint[i][2] = yaw;
+			}
+			else {
+				// For child joints, perform regular quaternion to Euler angle conversion
+				tf2::Quaternion quaternion(joint.orientation.x, joint.orientation.y, joint.orientation.z, joint.orientation.w);
+				tf2::Matrix3x3(quaternion).getRPY(roll, pitch, yaw);
+				
+				// Assign roll, pitch, and yaw directly to g_dexhand_joint
+				g_euler_joint[i][0] = roll;
+				g_euler_joint[i][1] = pitch;
+				g_euler_joint[i][2] = yaw;
+			}
+		}
+
+	#if DEBUG_PRINT
+			std::cout << "Node: " << i << " Rotation X, Y, Z, W "
+					<< joint.transform.rotation.x << ", "
+					<< joint.transform.rotation.y << ", "
+					<< joint.transform.rotation.z << ", "
+					<< joint.transform.rotation.w << ")" << std::endl;
+
+			// Print Euler angles
+			std::cout << "Node: " << i << " Roll, Pitch, Yaw: "
+					<< roll << ", " << pitch << ", " << yaw << std::endl;
+	#endif
+
+		// Publish the joint states
+		publish_joint_states();
+	}
+
 	rclcpp::Publisher<sensor_msgs::msg::JointState>::SharedPtr publisher_;
 	rclcpp::Subscription<geometry_msgs::msg::PoseArray>::SharedPtr manus_left_listener_;
 	rclcpp::Subscription<geometry_msgs::msg::PoseArray>::SharedPtr manus_right_listener_;
@@ -193,90 +259,9 @@ bool KeyDown()
 }
 
 
-/*void convertSkeletonDataToROS()
-{
-  ClientSkeletonCollection* csc = SDKMinimalClient::GetInstance()->CurrentSkeletons();
-	if (csc != nullptr && csc->skeletons.size() != 0)
-	{
-    cout << "Skeletons count " << csc->skeletons.size() << endl;
-    for (int i=0; i < csc->skeletons.size(); ++i) {
-      cout << i << ": Skeleton " << csc->skeletons[i].info.id << " nodes count " << csc->skeletons[i].info.nodesCount << endl;
-    }
-    double roll, pitch, yaw;
-    static bool initialized = false;
-		static ManusQuaternion referenceRotation = {1.0, 0.0, 0.0, 0.0}; // Initialize with identity quaternion
 
-		// Put the skeleton data in the bridge structure
-		for (uint32_t i = 0; i < csc->skeletons[0].info.nodesCount; i++)
-		{
-			const auto &joint = csc->skeletons[0].nodes[i];
-
-			// Calculate delta rotation only for the wrist (joint 0)
-			if (i == 0)
-			{
-				if (!initialized)
-				{
-					referenceRotation = joint.transform.rotation;
-					initialized = true;
-				}
-				else if (KeyDown())
-				{
-					initialized = false;
-				}
-
-				// Calculate the inverse of the reference rotation
-				ManusQuaternion referenceRotationInverse = InverseQuaternion(referenceRotation);
-
-				// Calculate the delta rotation
-				ManusQuaternion newRotationInverse = referenceRotationInverse * joint.transform.rotation;
-
-				double quaternion[4] = {0.0};
-				quaternion[0] = newRotationInverse.x;
-				quaternion[1] = newRotationInverse.y;
-				quaternion[2] = newRotationInverse.z;
-				quaternion[3] = newRotationInverse.w;
-
-				QuaternionToEulerAngles(quaternion, roll, pitch, yaw);
-
-				// Assign roll, pitch, and yaw directly to g_dexhand_joint
-				g_euler_joint[i][0] = roll;
-				g_euler_joint[i][1] = pitch;
-				g_euler_joint[i][2] = yaw;
-			}
-			else
-			{
-				// For child joints, perform regular quaternion to Euler angle conversion
-				double quaternion[4] = {0.0};
-				quaternion[0] = joint.transform.rotation.x;
-				quaternion[1] = joint.transform.rotation.y;
-				quaternion[2] = joint.transform.rotation.z;
-				quaternion[3] = joint.transform.rotation.w;
-
-				QuaternionToEulerAngles(quaternion, roll, pitch, yaw);
-
-				// Assign roll, pitch, and yaw directly to g_dexhand_joint
-				g_euler_joint[i][0] = roll;
-				g_euler_joint[i][1] = pitch;
-				g_euler_joint[i][2] = yaw;
-			}
-		}
-
-#if DEBUG_PRINT
-		std::cout << "Node: " << i << " Rotation X, Y, Z, W "
-				  << joint.transform.rotation.x << ", "
-				  << joint.transform.rotation.y << ", "
-				  << joint.transform.rotation.z << ", "
-				  << joint.transform.rotation.w << ")" << std::endl;
-
-		// Print Euler angles
-		std::cout << "Node: " << i << " Roll, Pitch, Yaw: "
-				  << roll << ", " << pitch << ", " << yaw << std::endl;
-#endif
-  }
         
 
-}
-*/
 
 // Main function - Initializes the minimal client and starts the ROS2 node
 int main(int argc, char *argv[])

@@ -10,6 +10,8 @@ find_package(ament_cmake REQUIRED)
 find_package(rclcpp REQUIRED)
 find_package(geometry_msgs REQUIRED)
 find_package(sensor_msgs REQUIRED)
+find_package(tf2_ros REQUIRED)
+find_package(tf2 REQUIRED)
 
 # Include directories
 include_directories(
@@ -17,10 +19,12 @@ include_directories(
   ${rclcpp_INCLUDE_DIRS}
   ${sensor_msgs_INCLUDE_DIRS}
   ${geometry_msgs_INCLUDE_DIRS}
+  ${tf2_ros_INCLUDE_DIRS}
+  ${tf2_INCLUDE_DIRS}
 )
 
 add_executable(dexhand_manus src/dexhand_manus.cpp)
-ament_target_dependencies(dexhand_manus rclcpp sensor_msgs geometry_msgs)
+ament_target_dependencies(dexhand_manus rclcpp sensor_msgs geometry_msgs tf2_ros tf2)
 
 if(BUILD_TESTING)
   find_package(ament_lint_auto REQUIRED)
