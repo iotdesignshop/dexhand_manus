@@ -11,6 +11,7 @@
 #include "rclcpp/rclcpp.hpp"
 #include "sensor_msgs/msg/joint_state.hpp"
 #include "geometry_msgs/msg/pose_array.hpp"
+#include "std_msgs/msg/string.hpp"
 #include "tf2/LinearMath/Quaternion.h"
 #include "tf2/LinearMath/Matrix3x3.h"
 
@@ -40,11 +41,15 @@ class DexHandManus : public rclcpp::Node
 public:
 	DexHandManus() : Node("dexhand_manus")
 	{
+		RCLCPP_INFO(this->get_logger(), "DexhandManus node started");
+
 		publisher_ = this->create_publisher<sensor_msgs::msg::JointState>("joint_states", 10);
 
 		manus_left_listener_ = this->create_subscription<geometry_msgs::msg::PoseArray>("manus_left", 10, std::bind(&DexHandManus::manus_left_callback, this, std::placeholders::_1));
 		manus_right_listener_ = this->create_subscription<geometry_msgs::msg::PoseArray>("manus_right", 10, std::bind(&DexHandManus::manus_right_callback, this, std::placeholders::_1));
 
+		command_subscriber_ = this->create_subscription<std_msgs::msg::String>(
+			"dexhand_manus_cmd", 10, std::bind(&DexHandManus::command_callback, this, std::placeholders::_1));
 
 		// Publish an initial joint state to reset the hand to a known position
 		publish_joint_states();
@@ -67,12 +72,29 @@ private:
 	void manus_left_callback(const geometry_msgs::msg::PoseArray::SharedPtr msg)
 	{
 		processPose(msg);
+		RCLCPP_INFO_THROTTLE(this->get_logger(), *this->get_clock(), 1000, "Receiving Manus Left Data");
 	}
 
 	// manus_right_callback - callback for the right manus glove
 	void manus_right_callback(const geometry_msgs::msg::PoseArray::SharedPtr msg)
 	{
 		processPose(msg);
+		RCLCPP_INFO_THROTTLE(this->get_logger(), *this->get_clock(), 1000, "Receiving Manus Right Data");
+	}
+
+	// command_callback - callback for the command subscriber
+	void command_callback(const std_msgs::msg::String::SharedPtr msg)
+	{
+		if (msg->data == "reset_origin")
+		{
+			// Reset the wrist position to center
+			initialized = false;
+			RCLCPP_INFO(this->get_logger(), "Resetting wrist position to center");
+		}
+		else
+		{
+			RCLCPP_INFO_STREAM(this->get_logger(), "Unknown command received:" << msg->data << "\n");
+		}
 	}
 
 	// Publishes the joint states to the ROS2 network
@@ -145,7 +167,6 @@ private:
 
 	void processPose(const geometry_msgs::msg::PoseArray::SharedPtr msg) {
 		double roll, pitch, yaw;
-		static bool initialized = false;
 		
 		// Initialize with identity quaternion
 		static tf2::Quaternion referenceRotation(1.0, 0.0, 0.0, 0.0);
@@ -162,7 +183,7 @@ private:
 					referenceRotation = tf2::Quaternion(joint.orientation.x, joint.orientation.y, joint.orientation.z, joint.orientation.w);
 					initialized = true;
 				}
-				else if (KeyDown()) {
+				else if (KeyDown()) {	
 					initialized = false;
 				}
 
@@ -211,6 +232,9 @@ private:
 	rclcpp::Publisher<sensor_msgs::msg::JointState>::SharedPtr publisher_;
 	rclcpp::Subscription<geometry_msgs::msg::PoseArray>::SharedPtr manus_left_listener_;
 	rclcpp::Subscription<geometry_msgs::msg::PoseArray>::SharedPtr manus_right_listener_;
+	rclcpp::Subscription<std_msgs::msg::String>::SharedPtr command_subscriber_;
+
+	bool initialized = false;
 };
 
 
