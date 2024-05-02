@@ -105,19 +105,14 @@ private:
 		joint_state.name.push_back("thumb_knuckle");
 		joint_state.name.push_back("thumb_tip");
 
-		const std::string t_FingerNames[NUM_FINGERS_ON_HAND] = {"[thumb] ", "[index] ", "[middle]", "[ring]  ", "[pinky] "};
-		const std::string t_FingerJointNames[NUM_FINGERS_ON_HAND] = {"mcp", "pip", "dip"};
-		const std::string t_ThumbJointNames[NUM_FINGERS_ON_HAND] = {"cmc", "mcp", "ip "};
+		//const std::string t_FingerNames[NUM_FINGERS_ON_HAND] = {"[thumb] ", "[index] ", "[middle]", "[ring]  ", "[pinky] "};
+		//const std::string t_FingerJointNames[NUM_FINGERS_ON_HAND] = {"mcp", "pip", "dip"};
+		//const std::string t_ThumbJointNames[NUM_FINGERS_ON_HAND] = {"cmc", "mcp", "ip "};
 
-		// alignment assumes wrist flat on table so testing the fingers is easier
-		// joint_state.position.push_back(0.0); // "wrist_pitch_lower"
-		// joint_state.position.push_back(0.0); // "wrist_pitch_upper"
-		// joint_state.position.push_back(0.0); // "wrist_yaw"
+		// Wrist pitch is spread across two joints
+		joint_state.position.push_back(-g_euler_joint[0][1]/2); // "wrist_pitch_lower"
+		joint_state.position.push_back(-g_euler_joint[0][1]/2); // "wrist_pitch_upper"
 
-		// print_joint(0);
-
-		joint_state.position.push_back(-g_euler_joint[0][1]); // "wrist_pitch_lower"
-		joint_state.position.push_back(-g_euler_joint[0][1]); // "wrist_pitch_upper"
 		joint_state.position.push_back(g_euler_joint[0][2]);  // "wrist_yaw"
 		joint_state.position.push_back(g_euler_joint[5][2]);  // "index_yaw"
 		joint_state.position.push_back(g_euler_joint[9][2]);  // "middle_yaw"
@@ -135,9 +130,9 @@ private:
 		joint_state.position.push_back(g_euler_joint[17][1]); // "pinky_pitch"
 		joint_state.position.push_back(g_euler_joint[18][1]); // "pinky_knuckle"
 		joint_state.position.push_back(g_euler_joint[19][1]); // "pinky_tip"
-		joint_state.position.push_back(g_euler_joint[1][2]);  // "thumb_yaw"
-		joint_state.position.push_back(g_euler_joint[1][0]);  // "thumb_roll"
-		joint_state.position.push_back(g_euler_joint[1][1]);  // "thumb_pitch"
+		joint_state.position.push_back(g_euler_joint[1][1]*2.0);  // "thumb_yaw"
+		joint_state.position.push_back(g_euler_joint[1][1]);  // "thumb_roll"
+		joint_state.position.push_back(-g_euler_joint[1][2]*2.0);  // "thumb_pitch"
 		joint_state.position.push_back(-g_euler_joint[2][2]); // "thumb_knuckle"
 		joint_state.position.push_back(-g_euler_joint[3][2]); // "thumb_tip"
 
