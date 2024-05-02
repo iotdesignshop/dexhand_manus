@@ -153,7 +153,7 @@ private:
 		joint_state.position.push_back(g_euler_joint[18][1]); // "pinky_knuckle"
 		joint_state.position.push_back(g_euler_joint[19][1]); // "pinky_tip"
 		joint_state.position.push_back(g_euler_joint[1][1]*2.0);  // "thumb_yaw"
-		joint_state.position.push_back(g_euler_joint[1][1]);  // "thumb_roll"
+		joint_state.position.push_back(-g_euler_joint[1][0]);  // "thumb_roll"
 		joint_state.position.push_back(-g_euler_joint[1][2]*2.0);  // "thumb_pitch"
 		joint_state.position.push_back(-g_euler_joint[2][2]); // "thumb_knuckle"
 		joint_state.position.push_back(-g_euler_joint[3][2]); // "thumb_tip"
