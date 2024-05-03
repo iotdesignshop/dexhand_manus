@@ -18,6 +18,7 @@
 #include <fstream>
 #include <iostream>
 #include <thread>
+#include <map>
 
 
 // Needed for isKeyPressed
@@ -34,6 +35,53 @@ static const int NUM_FINGERS_ON_HAND = 5;
 float g_euler_joint[24][3] = {0.0};
 
 bool KeyDown();
+
+class JointLimits
+{
+	public:
+		JointLimits(float min, float max) : min(min), max(max) {}
+		float apply(float value)
+		{
+			if (value < min)
+				return min;
+			if (value > max)
+				return max;
+			return value;
+		}
+
+	private:
+		float min;
+		float max;
+};
+
+// Ultimately, we would want to load these Joint Limits from the URDF or a configuration file
+// but for now, we will include these in a table here. 
+std::map<std::string, JointLimits> joint_limits = {
+	{"wrist_pitch_lower", JointLimits(-0.52, 0.52)},
+	{"wrist_pitch_upper", JointLimits(-0.349, 0.349)},
+	{"wrist_yaw", JointLimits(-0.436, 0.436)},
+	{"index_yaw", JointLimits(-0.349, 0.349)},
+	{"middle_yaw", JointLimits(-0.349, 0.349)},
+	{"ring_yaw", JointLimits(-0.349, 0.349)},
+	{"pinky_yaw", JointLimits(-0.349, 0.349)},
+	{"index_pitch", JointLimits(0, 1.05)},
+	{"index_knuckle", JointLimits(0, 0.785)},
+	{"index_tip", JointLimits(0, 0.785)},
+	{"middle_pitch", JointLimits(0, 1.05)},
+	{"middle_knuckle", JointLimits(0, 0.785)},
+	{"middle_tip", JointLimits(0, 0.785)},
+	{"ring_pitch", JointLimits(0, 1.05)},
+	{"ring_knuckle", JointLimits(0, 0.785)},
+	{"ring_tip", JointLimits(0, 0.785)},
+	{"pinky_pitch", JointLimits(0, 1.05)},
+	{"pinky_knuckle", JointLimits(0, 0.785)},
+	{"pinky_tip", JointLimits(0, 0.785)},
+	{"thumb_yaw", JointLimits(0, 0.872)},
+	{"thumb_roll", JointLimits(0, 0.349)},
+	{"thumb_pitch", JointLimits(0, 1.047)},
+	{"thumb_knuckle", JointLimits(0, 0.785)},
+	{"thumb_tip", JointLimits(0, 0.785)}
+};
 
 /// @brief ROS2 publisher class for the manus_ros2 node
 class DexHandManus : public rclcpp::Node
@@ -132,31 +180,32 @@ private:
 		//const std::string t_ThumbJointNames[NUM_FINGERS_ON_HAND] = {"cmc", "mcp", "ip "};
 
 		// Wrist pitch is spread across two joints
-		joint_state.position.push_back(-g_euler_joint[0][1]/2); // "wrist_pitch_lower"
-		joint_state.position.push_back(-g_euler_joint[0][1]/2); // "wrist_pitch_upper"
 
-		joint_state.position.push_back(g_euler_joint[0][2]);  // "wrist_yaw"
-		joint_state.position.push_back(g_euler_joint[5][2]);  // "index_yaw"
-		joint_state.position.push_back(g_euler_joint[9][2]);  // "middle_yaw"
-		joint_state.position.push_back(g_euler_joint[13][2]); // "ring_yaw"
-		joint_state.position.push_back(g_euler_joint[17][2]); // "pinky_yaw"
-		joint_state.position.push_back(g_euler_joint[5][1]);  // "index_pitch"
-		joint_state.position.push_back(g_euler_joint[6][1]);  // "index_knuckle"
-		joint_state.position.push_back(g_euler_joint[7][1]);  // "index_tip"
-		joint_state.position.push_back(g_euler_joint[9][1]);  // "middle_pitch"
-		joint_state.position.push_back(g_euler_joint[10][1]); // "middle_knuckle"
-		joint_state.position.push_back(g_euler_joint[11][1]); // "middle_tip"
-		joint_state.position.push_back(g_euler_joint[13][1]); // "ring_pitch"
-		joint_state.position.push_back(g_euler_joint[14][1]); // "ring_knuckle"
-		joint_state.position.push_back(g_euler_joint[15][1]); // "ring_tip"
-		joint_state.position.push_back(g_euler_joint[17][1]); // "pinky_pitch"
-		joint_state.position.push_back(g_euler_joint[18][1]); // "pinky_knuckle"
-		joint_state.position.push_back(g_euler_joint[19][1]); // "pinky_tip"
-		joint_state.position.push_back(g_euler_joint[1][1]*2.0);  // "thumb_yaw"
-		joint_state.position.push_back(-g_euler_joint[1][0]);  // "thumb_roll"
-		joint_state.position.push_back(-g_euler_joint[1][2]*2.0);  // "thumb_pitch"
-		joint_state.position.push_back(-g_euler_joint[2][2]); // "thumb_knuckle"
-		joint_state.position.push_back(-g_euler_joint[3][2]); // "thumb_tip"
+		joint_state.position.push_back(joint_limits.at("wrist_pitch_lower").apply(-g_euler_joint[0][1]/2)); // "wrist_pitch_lower"
+		joint_state.position.push_back(joint_limits.at("wrist_pitch_upper").apply(-g_euler_joint[0][1]/2)); // "wrist_pitch_upper"
+
+		joint_state.position.push_back(joint_limits.at("wrist_yaw").apply(g_euler_joint[0][2]));  // "wrist_yaw"
+		joint_state.position.push_back(joint_limits.at("index_yaw").apply(g_euler_joint[5][2]));  // "index_yaw"
+		joint_state.position.push_back(joint_limits.at("middle_yaw").apply(g_euler_joint[9][2]));  // "middle_yaw"
+		joint_state.position.push_back(joint_limits.at("ring_yaw").apply(g_euler_joint[13][2])); // "ring_yaw"
+		joint_state.position.push_back(joint_limits.at("pinky_yaw").apply(g_euler_joint[17][2])); // "pinky_yaw"
+		joint_state.position.push_back(joint_limits.at("index_pitch").apply(g_euler_joint[5][1]));  // "index_pitch"
+		joint_state.position.push_back(joint_limits.at("index_knuckle").apply(g_euler_joint[6][1]));  // "index_knuckle"
+		joint_state.position.push_back(joint_limits.at("index_tip").apply(g_euler_joint[7][1]));  // "index_tip"
+		joint_state.position.push_back(joint_limits.at("middle_pitch").apply(g_euler_joint[9][1]));  // "middle_pitch"
+		joint_state.position.push_back(joint_limits.at("middle_knuckle").apply(g_euler_joint[10][1])); // "middle_knuckle"
+		joint_state.position.push_back(joint_limits.at("middle_tip").apply(g_euler_joint[11][1])); // "middle_tip"
+		joint_state.position.push_back(joint_limits.at("ring_pitch").apply(g_euler_joint[13][1])); // "ring_pitch"
+		joint_state.position.push_back(joint_limits.at("ring_knuckle").apply(g_euler_joint[14][1])); // "ring_knuckle"
+		joint_state.position.push_back(joint_limits.at("ring_tip").apply(g_euler_joint[15][1])); // "ring_tip"
+		joint_state.position.push_back(joint_limits.at("pinky_pitch").apply(g_euler_joint[17][1])); // "pinky_pitch"
+		joint_state.position.push_back(joint_limits.at("pinky_knuckle").apply(g_euler_joint[18][1])); // "pinky_knuckle"
+		joint_state.position.push_back(joint_limits.at("pinky_tip").apply(g_euler_joint[19][1])); // "pinky_tip"
+		joint_state.position.push_back(joint_limits.at("thumb_yaw").apply(g_euler_joint[1][1]*2.0));  // "thumb_yaw"
+		joint_state.position.push_back(joint_limits.at("thumb_roll").apply(-g_euler_joint[1][0]));  // "thumb_roll"
+		joint_state.position.push_back(joint_limits.at("thumb_pitch").apply(-g_euler_joint[1][2]*2.0));  // "thumb_pitch"
+		joint_state.position.push_back(joint_limits.at("thumb_knuckle").apply(-g_euler_joint[2][2])); // "thumb_knuckle"
+		joint_state.position.push_back(joint_limits.at("thumb_tip").apply(-g_euler_joint[3][2])); // "thumb_tip"
 
 		// Set timestamp to current ROS time
 		joint_state.header.stamp = this->now();

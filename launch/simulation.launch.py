@@ -33,11 +33,6 @@ def generate_launch_description():
             name='manus_ros2',
             output='screen'),
         Node(
-            package='dexhand_manus',
-            executable='dexhand_manus',
-            name='dexhand_manus',
-            output='screen'),
-        Node(
             package='rviz2',
             executable='rviz2',
             name='rviz2',
@@ -48,5 +43,10 @@ def generate_launch_description():
             executable='gui_node',
             name='gui_node',
             output='screen'
-        )
+        ),
+        Node(
+            package='dexhand_manus',
+            executable='dexhand_manus',
+            name='dexhand_manus',
+            output='screen')
     ])
