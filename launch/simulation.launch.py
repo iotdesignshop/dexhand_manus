@@ -28,25 +28,25 @@ def generate_launch_description():
             output='screen',
             parameters=[{'robot_description': urdf}]),
         Node(
-            package='manus_ros2',
-            executable='manus_ros2',
-            name='manus_ros2',
-            output='screen'),
-        Node(
             package='rviz2',
             executable='rviz2',
             name='rviz2',
             output='screen',
             arguments=['-d', str(rviz_path)]),
         Node(
+            package='manus_ros2',
+            executable='manus_ros2',
+            name='manus_ros2',
+            output='screen'),
+        Node(
             package='dexhand_manus_gui',
             executable='gui_node',
             name='gui_node',
-            output='screen'
-        ),
+            output='screen'),
         Node(
             package='dexhand_manus',
             executable='dexhand_manus',
             name='dexhand_manus',
             output='screen')
+        
     ])

@@ -99,8 +99,11 @@ public:
 		command_subscriber_ = this->create_subscription<std_msgs::msg::String>(
 			"dexhand_manus_cmd", 10, std::bind(&DexHandManus::command_callback, this, std::placeholders::_1));
 
-		// Publish an initial joint state to reset the hand to a known position
-		publish_joint_states();
+
+		// Start a timer to publish default joint states until we get a message
+		default_timer_ = this->create_wall_timer(10ms, std::bind(&DexHandManus::publish_joint_states, this));
+
+		
     }
 
 	// print_joint - prints global joint data from Manus Hand after transform
@@ -116,9 +119,20 @@ public:
 
 private:
 
+	// cancels the default timer
+	void cancel_default_timer()
+	{
+		if (default_timer_ != nullptr) {
+			default_timer_->cancel();
+			default_timer_ = nullptr;
+		}
+		
+	}
+
 	// manus_left_callback - callback for the left manus glove
 	void manus_left_callback(const geometry_msgs::msg::PoseArray::SharedPtr msg)
 	{
+		cancel_default_timer();
 		processPose(msg);
 		RCLCPP_INFO_THROTTLE(this->get_logger(), *this->get_clock(), 1000, "Receiving Manus Left Data");
 	}
@@ -126,6 +140,8 @@ private:
 	// manus_right_callback - callback for the right manus glove
 	void manus_right_callback(const geometry_msgs::msg::PoseArray::SharedPtr msg)
 	{
+		cancel_default_timer();
+
 		processPose(msg);
 		RCLCPP_INFO_THROTTLE(this->get_logger(), *this->get_clock(), 1000, "Receiving Manus Right Data");
 	}
@@ -282,6 +298,7 @@ private:
 	rclcpp::Subscription<geometry_msgs::msg::PoseArray>::SharedPtr manus_left_listener_;
 	rclcpp::Subscription<geometry_msgs::msg::PoseArray>::SharedPtr manus_right_listener_;
 	rclcpp::Subscription<std_msgs::msg::String>::SharedPtr command_subscriber_;
+	rclcpp::TimerBase::SharedPtr default_timer_;
 
 	bool initialized = false;
 };
