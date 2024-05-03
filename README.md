@@ -4,7 +4,7 @@ ROS 2 Node for Dexhand to Manus VR Glove Integration With Examples
 
 ## Function
 
-The `dexhand_manus` node is a bridge between the `manus_ros2` which publishes Manus VR Glove events as ROS 2 messges and DexHand hardware and software simulations. 
+The `dexhand_manus` node is a bridge between the `manus_ros2` package which publishes Manus VR Glove events as ROS 2 messges and DexHand hardware and software simulations. 
 
 The `manus_ros2` node broadcasts ROS 2 PoseArray messages named `manus_left` and `manus_right` which contain position and rotation information from the Manus VR Gloves.
 
